@@ -1,7 +1,7 @@
 <!--[build_status]: https://api.travis-ci.org/OnSyte/lbwf-onsyte.svg?branch=master-->
 
 <p align="center" style="text-align: center">
-    <a style="display:inline-block" href="https://lbwf.onsyte.co.uk"><img src="https://ztlartcc.org/photos/logo.png" width="45%" /></a>
+    <a style="display:inline-block" href="https://lbwf.onsyte.co.uk"><img src="" width="45%" /></a>
 </p>
 
 # About
