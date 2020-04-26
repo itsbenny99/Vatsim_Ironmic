@@ -15,7 +15,7 @@ use Illuminate\Support\Facades\Route;
 
 Route::get('/', 'FrontController@home');
 
-// Login 
+// Login
 Route::get('login', 'AuthController@index');
 Route::post('post-login', 'AuthController@postLogin');
 Route::get('registration', 'AuthController@registration');
