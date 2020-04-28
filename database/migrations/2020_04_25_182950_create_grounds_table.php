@@ -15,6 +15,8 @@ class CreateGroundsTable extends Migration
     {
         Schema::create('grounds', function (Blueprint $table) {
             $table->id();
+            $table->string('realname');
+            $table->bigInteger('cid');
             $table->string('position');
             $table->float('frequency');
             $table->boolean('session_end')->default(false);

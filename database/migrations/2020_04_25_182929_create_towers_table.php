@@ -15,6 +15,8 @@ class CreateTowersTable extends Migration
     {
         Schema::create('towers', function (Blueprint $table) {
             $table->id();
+            $table->string('realname');
+            $table->bigInteger('cid');
             $table->string('position');
             $table->float('frequency');
             $table->boolean('session_end')->default(false);

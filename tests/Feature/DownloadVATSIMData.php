@@ -9,6 +9,8 @@ use App\Models\FlightServiceStation;
 use App\Models\Ground;
 use App\Models\Tower;
 use Carbon\Carbon;
+use Illuminate\Foundation\Testing\DatabaseMigrations;
+use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Foundation\Testing\WithFaker;
 use Illuminate\Support\Str;
@@ -16,90 +18,86 @@ use Tests\TestCase;
 
 class DownloadVATSIMData extends TestCase
 {
-    use RefreshDatabase;
+    use DatabaseMigrations;
 
     /** @test */
     public function get_vatsim_data()
     {
         $json = \GuzzleHttp\json_decode(file_get_contents("http://cluster.data.vatsim.net/vatsim-data.json"));
-        $controllers = collect($json->clients)->filter(function($item) {
-            return !Str::contains($item->callsign, "ATIS") and $item->frequency !== "199.998" and $item->clienttype == "ATC";
+        $atcTypes = [
+            [
+                "type" => "DEL",
+                "model" => Delivery::class
+            ],
+            [
+                "type" => "GND",
+                "model" => Ground::class
+            ],
+            [
+                "type" => "TWR",
+                "model" => Tower::class
+            ],
+            [
+                "type" => "APP",
+                "model" => Approach::class
+            ],
+            [
+                "type" => "CTR",
+                "model" => Center::class
+            ],
+            [
+                "type" => "FSS",
+                "model" => FlightServiceStation::class
+            ],
+        ];
+        $controllers = collect($json->clients)->filter(function ($item) {
+            return !Str::contains($item->callsign, "ATIS") and !Str::contains($item->callsign, "_X_") and !Str::contains($item->callsign, "_M_") and $item->frequency !== "199.998" and $item->clienttype == "ATC";
         });
 
-        $DEL = $controllers->filter(function($item) {
-            return Str::contains($item->callsign, "DEL");
-        });
-
-        $GND = $controllers->filter(function($item) {
-            return Str::contains($item->callsign, "GND");
-        });
-
-        $TWR = $controllers->filter(function($item) {
-            return Str::contains($item->callsign, "TWR");
-        });
-
-        $APP = $controllers->filter(function($item) {
-            return Str::contains($item->callsign, "APP");
-        });
-
-        $CTR = $controllers->filter(function($item) {
-            return Str::contains($item->callsign, "CTR");
-        });
-
-        $FSS = $controllers->filter(function($item) {
-            return Str::contains($item->callsign, "FSS");
-        });
-
-        foreach($controllers as $controller) {
-            if (Str::contains($controller->callsign, "DEL")) {
-                $this->create_new_controller(Ground::class, $controller);
-            }
-            if (Str::contains($controller->callsign, "GND")) {
-                $this->create_new_controller(Ground::class, $controller);
-            }
-            if (Str::contains($controller->callsign, "TWR")) {
-                $this->create_new_controller(Tower::class, $controller);
-            }
-            if (Str::contains($controller->callsign, "CTR")) {
-                $this->create_new_controller(Center::class, $controller);
-            }
-            if (Str::contains($controller->callsign, "FSS")) {
-                $this->create_new_controller(FlightServiceStation::class, $controller);
-            }
+        foreach ($atcTypes as $atc) {
+            $this->validate_controller(($controllers->filter(function ($item) use ($atc) {
+                return Str::contains($item->callsign, $atc["type"]);
+            })), $atc["model"]);
         }
-
-        $first = Delivery::all()->toArray();
-        dd($first);
-
     }
 
-    public function validate_controller($controllers, $model) {
+    public function validate_controller($controllers, $model)
+    {
         $sessions = $model::where(["session_end" => false])->get();
         foreach ($sessions as $session) {
-
-            foreach ($controllers as $controller) {
-
-                if ($session->realname !== $controller->realname) {
-                    
+            if ($controllers) {
+                if (!in_array($session->cid, $controllers->pluck('cid')->toArray())) {
+                    $this->end_session($session, $model);
+                } else {
+                    $this->increase_minute($session, $model);
                 }
-
             }
-
         }
-
-        if ($session = $model::where(["session_end" => false], ["callsign" => $controller->callsign], ["fullname" => $controller->name])->first()) {
-            $session->time_online
-                = Carbon::parse($session->time_online)->addMinute();
-            $session->save();
-        } else {
-
+        foreach ($controllers as $controller) {
+            $sessions = $model::where(["session_end" => false, "position" => $controller->callsign, "cid" => $controller->cid])->first();
+            if (!$sessions) {
+                $this->start_session($controller, $model);
+            }
         }
     }
 
-    public function create_position_array($controller)
+    public function increase_minute($controller, $model)
+    {
+        $controller->time_online = Carbon::parse($controller->time_online)->addMinute();
+        $controller->save();
+    }
 
-    public function create_new_controller($model, $controller) {
+    public function end_session($controller, $model)
+    {
+        $controller->session_end = true;
+        $controller->save();
+    }
+
+    public function start_session($controller, $model)
+    {
         $data = new $model();
+        $data->realname = $controller->realname;
+        $data->cid = $controller->cid;
         $data->position = $controller->callsign;
         $data->frequency = $controller->frequency;
         $data->time_online = Carbon::now()->startOfDay()->format('H:i:s');

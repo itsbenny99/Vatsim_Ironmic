@@ -6,5 +6,5 @@ use Illuminate\Database\Eloquent\Model;
 
 class Center extends Model
 {
-    protected $fillable = ['position', 'frequency'];
+    protected $fillable = ['realname', 'cid', 'position', 'frequency', 'session_end', 'time_online'];
 }

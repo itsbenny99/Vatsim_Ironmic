@@ -6,5 +6,5 @@ use Illuminate\Database\Eloquent\Model;
 
 class Approach extends Model
 {
-    protected $fillable = ['position', 'frequency'];
+    protected $fillable = ['realname', 'cid', 'position', 'frequency', 'session_end', 'time_online'];
 }
